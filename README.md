@@ -1,0 +1,2 @@
+# AOSPRead
+AOSP中davlik和libcore模块源码与学习时加的注释
