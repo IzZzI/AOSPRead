@@ -215,8 +215,10 @@ int dvmJarFileOpen(const char* fileName, const char* odexOutputName,
     /* First, look for a ".odex" alongside the jar file.  It will
      * have the same name/path except for the extension.
      */
+     //打开同路径的odex文件
     fd = openAlternateSuffix(fileName, "odex", O_RDONLY, &cachedName);
     if (fd >= 0) {
+		//存在odex就是使用odex文件
         ALOGV("Using alternate file (odex) for %s ...", fileName);
         if (!dvmCheckOptHeaderAndDependencies(fd, false, 0, 0, true, true)) {
             ALOGE("%s odex has stale dependencies", fileName);
@@ -232,6 +234,7 @@ int dvmJarFileOpen(const char* fileName, const char* odexOutputName,
             //      For typical use there will be no classes.dex.
         }
     } else {
+    //不存在
         ZipEntry entry;
 
 tryArchive:
@@ -239,6 +242,7 @@ tryArchive:
          * Pre-created .odex absent or stale.  Look inside the jar for a
          * "classes.dex".
          */
+       	//寻找classes.dex条目
         entry = dexZipFindEntry(&archive, kDexInJarName);
         if (entry != NULL) {
             bool newFile = false;
@@ -254,6 +258,7 @@ tryArchive:
              * .odex file; the fd will point into dalvik-cache like any
              * other jar.
              */
+            //查看是否有最新的copy在缓存中
             if (odexOutputName == NULL) {
                 cachedName = dexOptGenerateCacheFileName(fileName,
                                 kDexInJarName);

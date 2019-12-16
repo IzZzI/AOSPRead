@@ -129,6 +129,8 @@ int dvmRawDexFileOpen(const char* fileName, const char* odexOutputName,
     if (dexFd < 0) goto bail;
 
     /* If we fork/exec into dexopt, don't let it inherit the open fd. */
+	//https://blog.csdn.net/bemf168/article/details/80025365
+	//父进程在fork函数时，应当关闭文件描述符
     dvmSetCloseOnExec(dexFd);
 	//校验魔数并获取Adler32(checksum)
     if (verifyMagicAndGetAdler32(dexFd, &adler32) < 0) {

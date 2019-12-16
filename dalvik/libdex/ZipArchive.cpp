@@ -103,7 +103,6 @@ static int entryToIndex(const ZipArchive* pArchive, const ZipEntry entry)
 static unsigned int computeHash(const char* str, int len)
 {
     unsigned int hash = 0;
-
     while (len--)
         hash = hash * 31 + *str++;
 
@@ -116,6 +115,7 @@ static unsigned int computeHash(const char* str, int len)
 static void addToHash(ZipArchive* pArchive, const char* str, int strLen,
     unsigned int hash)
 {
+	//HashTable实现原理
     const int hashTableSize = pArchive->mHashTableSize;
     int ent = hash & (hashTableSize - 1);
 
@@ -390,7 +390,7 @@ static int parseZipArchive(ZipArchive* pArchive)
      * low as 50% after we round off to a power of 2.  There must be at
      * least one unused entry to avoid an infinite loop during creation.
      */
- 	//
+ 	//设置HashTable的大小,使用到了位运算
     pArchive->mHashTableSize = dexRoundUpPower2(1 + (numEntries * 4) / 3);
 	//分配mHashTableSize个内存空间
     pArchive->mHashTable = (ZipHashEntry*)
@@ -408,29 +408,34 @@ static int parseZipArchive(ZipArchive* pArchive)
             ALOGW("Zip: missed a central dir sig (at %d)", i);
             goto bail;
         }
-		
+
+		//核心目录长度 = 46字节 + 3个variable size
         if (ptr + kCDELen > cdPtr + cdLength) {
             ALOGW("Zip: ran off the end (at %d)", i);
             goto bail;
         }
-
+		//本地文件头的偏移量
         long localHdrOffset = (long) get4LE(ptr + kCDELocalOffset);
+		//如果本地文件头的偏移量 >= 核心目录的开始位置
         if (localHdrOffset >= pArchive->mDirectoryOffset) {
             ALOGW("Zip: bad LFH offset %ld at entry %d", localHdrOffset, i);
             goto bail;
         }
-
+		//通用位标记
         unsigned int gpbf = get2LE(ptr + kCDEGPBFlags);
         if ((gpbf & kGPFUnsupportedMask) != 0) {
             ALOGW("Invalid General Purpose Bit Flag: %d", gpbf);
             goto bail;
         }
-
-        unsigned int nameLen, extraLen, commentLen, hash;
+		
+        unsigned int nameLen, extraLen, commentLen, hash;
+		//文件名长度
         nameLen = get2LE(ptr + kCDENameLen);
+		//扩展域长度
         extraLen = get2LE(ptr + kCDEExtraLen);
+		//文件注释长度
         commentLen = get2LE(ptr + kCDECommentLen);
-
+		//文件名
         const char *name = (const char *) ptr + kCDELen;
 
         /* Check name for NULL characters */
@@ -438,8 +443,9 @@ static int parseZipArchive(ZipArchive* pArchive)
             ALOGW("Filename contains NUL byte");
             goto bail;
         }
-
+		
         /* add the CDE filename to the hash table */
+		//计算hash并加入哈希表
         hash = computeHash(name, nameLen);
         addToHash(pArchive, name, nameLen, hash);
 
@@ -502,7 +508,7 @@ int dexZipPrepArchive(int fd, const char* debugFileName, ZipArchive* pArchive)
 	//映射核心目录到内存
     if (mapCentralDirectory(fd, debugFileName, pArchive) != 0)
         goto bail;
-	//解析
+	//解析zip
     if (parseZipArchive(pArchive) != 0) {
         ALOGV("Zip: parsing '%s' failed", debugFileName);
         goto bail;
@@ -622,19 +628,21 @@ int dexZipGetEntryInfo(const ZipArchive* pArchive, ZipEntry entry,
     off_t cdOffset = pArchive->mDirectoryOffset;
 
     ptr -= kCDELen;
-
+	//压缩方法
     int method = get2LE(ptr + kCDEMethod);
     if (pMethod != NULL)
         *pMethod = method;
-
+	//last mod file time
     if (pModWhen != NULL)
         *pModWhen = get4LE(ptr + kCDEModWhen);
+	//CRC-32校验码
     if (pCrc32 != NULL)
         *pCrc32 = get4LE(ptr + kCDECRC);
-
+	//压缩后大小
     size_t compLen = get4LE(ptr + kCDECompLen);
     if (pCompLen != NULL)
         *pCompLen = compLen;
+	//未压缩大小
     size_t uncompLen = get4LE(ptr + kCDEUncompLen);
     if (pUncompLen != NULL)
         *pUncompLen = uncompLen;
@@ -656,49 +664,51 @@ int dexZipGetEntryInfo(const ZipArchive* pArchive, ZipEntry entry,
      */
     if (pOffset != NULL) {
         long localHdrOffset = (long) get4LE(ptr + kCDELocalOffset);
+		//确保文件至少有local file header的大小（30字节 不包括可变大小的字段）
         if (localHdrOffset + kLFHLen >= cdOffset) {
             ALOGW("Zip: bad local hdr offset in zip");
             return -1;
         }
-
+		
         u1 lfhBuf[kLFHLen];
         if (lseek(pArchive->mFd, localHdrOffset, SEEK_SET) != localHdrOffset) {
             ALOGW("Zip: failed seeking to lfh at offset %ld", localHdrOffset);
             return -1;
         }
+		//读取local file header 到lfhBuf中
         ssize_t actual =
             TEMP_FAILURE_RETRY(read(pArchive->mFd, lfhBuf, sizeof(lfhBuf)));
         if (actual != sizeof(lfhBuf)) {
             ALOGW("Zip: failed reading lfh from offset %ld", localHdrOffset);
             return -1;
         }
-
+		//检验signature(0x04034b50)     
         if (get4LE(lfhBuf) != kLFHSignature) {
             ALOGW("Zip: didn't find signature at start of lfh, offset=%ld",
                 localHdrOffset);
             return -1;
         }
-
+		//校验general purpose bit flag（通用位标记）
         u4 gpbf = get2LE(lfhBuf + kLFHGPBFlags);
         if ((gpbf & kGPFUnsupportedMask) != 0) {
             ALOGW("Invalid General Purpose Bit Flag: %d", gpbf);
             return -1;
         }
-
+		//header大小
         off64_t dataOffset = localHdrOffset + kLFHLen
             + get2LE(lfhBuf + kLFHNameLen) + get2LE(lfhBuf + kLFHExtraLen);
         if (dataOffset >= cdOffset) {
             ALOGW("Zip: bad data offset %ld in zip", (long) dataOffset);
             return -1;
         }
-
+		//header大小 + 压缩后文件大小的偏移肯定在中心目录偏移前
         /* check lengths */
         if ((off_t)(dataOffset + compLen) > cdOffset) {
             ALOGW("Zip: bad compressed length in zip (%ld + %zd > %ld)",
                 (long) dataOffset, compLen, (long) cdOffset);
             return -1;
         }
-
+		//没有压缩的格式校验
         if (method == kCompressStored &&
             (off_t)(dataOffset + uncompLen) > cdOffset)
         {

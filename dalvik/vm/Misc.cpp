@@ -573,11 +573,16 @@ bool dvmSetCloseOnExec(int fd)
      * There's presently only one flag defined, so getting the previous
      * value of the fd flags is probably unnecessary.
      */
+
+	//fcntl系统调用可以用来对已打开的文件描述符进行各种控制操作以改变已打开文件的的各种属性
+	//F_GETFD 获取文件描述符
     flags = fcntl(fd, F_GETFD);
     if (flags < 0) {
         ALOGW("Unable to get fd flags for fd %d", fd);
         return false;
     }
+	//F_SETFD 设置文件描述符
+	//FD_CLOEXEC 表示子进程在执行exec的时候，该文件描述符就需要进行关闭。
     if (fcntl(fd, F_SETFD, flags | FD_CLOEXEC) < 0) {
         ALOGW("Unable to set close-on-exec for fd %d", fd);
         return false;
