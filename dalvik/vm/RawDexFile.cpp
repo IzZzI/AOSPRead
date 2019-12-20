@@ -150,6 +150,7 @@ int dvmRawDexFileOpen(const char* fileName, const char* odexOutputName,
      */
 
     if (odexOutputName == NULL) {
+		//缓存名称为：/data/dalvik-cache/dirName@subDirName@FileName.dex
         cachedName = dexOptGenerateCacheFileName(fileName, NULL);
         if (cachedName == NULL)
             goto bail;

@@ -426,7 +426,7 @@ static int fromDex(int argc, char* const argv[])
     bool onlyOptVerifiedDex = false;
     DexClassVerifyMode verifyMode;
     DexOptimizerMode dexOptMode;
-
+	//参数个数
     if (argc < 10) {
         /* don't have all mandatory args */
         ALOGE("Not enough arguments for --dex (found %d)", argc);

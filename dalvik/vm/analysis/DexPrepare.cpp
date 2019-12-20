@@ -1191,7 +1191,7 @@ bool dvmCheckOptHeaderAndDependencies(int fd, bool sourceAvail, u4 modWhen,
      * Start at the start.  The "opt" header, when present, will always be
      * the first thing in the file.
      */
-    //fd执行文件开始
+    //fd指向文件开始
     if (lseek(fd, 0, SEEK_SET) != 0) {
         ALOGE("DexOpt: failed to seek to start of file: %s", strerror(errno));
         goto bail;

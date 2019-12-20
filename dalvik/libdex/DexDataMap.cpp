@@ -40,7 +40,7 @@ DexDataMap* dexDataMapAlloc(u4 maxCount) {
         !safe_add(&size, size, sizeof(DexDataMap))) {
       return NULL;
     }
-
+	//分配内存
     map = (DexDataMap*) malloc(size);
 
     if (map == NULL) {
@@ -50,6 +50,7 @@ DexDataMap* dexDataMapAlloc(u4 maxCount) {
     map->count = 0;
     map->max = maxCount;
     map->offsets = (u4*) (map + 1);
+	
     map->types = (u2*) (map->offsets + maxCount);
 
     return map;

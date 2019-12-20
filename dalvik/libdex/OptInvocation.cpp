@@ -56,6 +56,7 @@ char* dexOptGenerateCacheFileName(const char* fileName, const char* subFileName)
      * Get the absolute path of the Jar or DEX file.
      */
     absoluteFile[0] = '\0';
+	//
     if (fileName[0] != '/') {
         /*
          * Generate the absolute path.  This doesn't do everything it
@@ -83,6 +84,7 @@ char* dexOptGenerateCacheFileName(const char* fileName, const char* subFileName)
     /* Turn the path into a flat filename by replacing
      * any slashes after the first one with '@' characters.
      */
+    //将路径/替换为@
     cp = absoluteFile + 1;
     while (*cp != '\0') {
         if (*cp == '/') {
@@ -96,10 +98,12 @@ char* dexOptGenerateCacheFileName(const char* fileName, const char* subFileName)
     dataRoot = getenv("ANDROID_DATA");
     if (dataRoot == NULL)
         dataRoot = "/data";
+	//nameBuf = "/data/dalvik-cache"
     snprintf(nameBuf, kBufLen, "%s/%s", dataRoot, kCacheDirectoryName);
 
     /* Tack on the file name for the actual cache file path.
      */
+     //nameBuf = "/data/dalvik-cache/..."
     strncat(nameBuf, absoluteFile, kBufLen);
 
     ALOGV("Cache file for '%s' '%s' is '%s'", fileName, subFileName, nameBuf);

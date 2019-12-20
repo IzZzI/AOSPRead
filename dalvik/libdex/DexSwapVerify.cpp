@@ -271,7 +271,8 @@ static bool setDefinedClassBit(const CheckState* state, u4 typeIdx) {
  * Swap the header_item.
  */
 static bool swapDexHeader(const CheckState* state, DexHeader* pHeader)
-{
+{	
+	//验证header指针位置是否正确
     CHECK_PTR_RANGE(pHeader, pHeader + 1);
 
     // magic is ok
@@ -397,6 +398,7 @@ static bool swapMap(CheckState* state, DexMapList* pMap)
     DexMapItem* item = pMap->list;
     u4 count;
     u4 dataItemCount = 0; // Total count of items in the data section.
+    //data段大小
     u4 dataItemsLeft = state->pHeader->dataSize; // See use below.
     u4 usedBits = 0;      // Bit set: one bit per section
     bool first = true;
@@ -406,13 +408,13 @@ static bool swapMap(CheckState* state, DexMapList* pMap)
     count = pMap->size;
 
     CHECK_LIST_SIZE(item, count, sizeof(DexMapItem));
-
+	//获取map_list的类型并转换成位标识
     while (count--) {
         SWAP_FIELD2(item->type);
         SWAP_FIELD2(item->unused);
         SWAP_FIELD4(item->size);
         SWAP_OFFSET4(item->offset);
-
+		
         if (first) {
             first = false;
         } else if (lastOffset >= item->offset) {
@@ -426,7 +428,7 @@ static bool swapMap(CheckState* state, DexMapList* pMap)
                     item->offset, state->pHeader->fileSize);
             return false;
         }
-
+		//是否是数据段类型
         if (isDataSectionType(item->type)) {
             u4 icount = item->size;
 
@@ -435,16 +437,17 @@ static bool swapMap(CheckState* state, DexMapList* pMap)
              * there are no more items than the number of bytes in
              * the data section.
              */
+             //确保数据部分中的项不超过字节数
             if (icount > dataItemsLeft) {
                 ALOGE("Unrealistically many items in the data section: "
                         "at least %d", dataItemCount + icount);
                 return false;
             }
-
+			
             dataItemsLeft -= icount;
             dataItemCount += icount;
         }
-
+		//将类型转化为位标识
         u4 bit = mapTypeToBitMask(item->type);
 
         if (bit == 0) {
@@ -460,7 +463,7 @@ static bool swapMap(CheckState* state, DexMapList* pMap)
         lastOffset = item->offset;
         item++;
     }
-
+	//判断是否有以下类型
     if ((usedBits & mapTypeToBitMask(kDexTypeHeaderItem)) == 0) {
         ALOGE("Map is missing header entry");
         return false;
@@ -512,7 +515,7 @@ static bool swapMap(CheckState* state, DexMapList* pMap)
         ALOGE("Map is missing class_defs entry");
         return false;
     }
-
+	
     state->pDataMap = dexDataMapAlloc(dataItemCount);
     if (state->pDataMap == NULL) {
         ALOGE("Unable to allocate data map (size %#x)", dataItemCount);
@@ -2873,10 +2876,10 @@ int dexSwapAndVerify(u1* addr, int len)
         const int nonSum = sizeof(pHeader->magic) + sizeof(pHeader->checksum);
         u4 storedFileSize = SWAP4(pHeader->fileSize);
         u4 expectedChecksum = SWAP4(pHeader->checksum);
-
+		//获取checksum
         adler = adler32(adler, ((const u1*) pHeader) + nonSum,
                     storedFileSize - nonSum);
-
+		//校对
         if (adler != expectedChecksum) {
             ALOGE("ERROR: bad checksum (%08lx, expected %08x)",
                 adler, expectedChecksum);
@@ -2921,7 +2924,7 @@ int dexSwapAndVerify(u1* addr, int len)
         if (pHeader->mapOff != 0) {
             DexFile dexFile;
             DexMapList* pDexMap = (DexMapList*) (addr + pHeader->mapOff);
-
+			//矫正map
             okay = okay && swapMap(&state, pDexMap);
             okay = okay && swapEverythingButHeaderAndMap(&state, pDexMap);
 
