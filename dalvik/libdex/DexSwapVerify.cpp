@@ -2402,11 +2402,12 @@ typedef void* ItemVisitorFunction(const CheckState* state, void* ptr);
 static bool iterateSectionWithOptionalUpdate(CheckState* state,
         u4 offset, u4 count, ItemVisitorFunction* func, u4 alignment,
         u4* nextOffset, int mapType) {
+   	//3
     u4 alignmentMask = alignment - 1;
     u4 i;
 
     state->previousItem = NULL;
-
+	//项内个数
     for (i = 0; i < count; i++) {
         u4 newOffset = (offset + alignmentMask) & ~alignmentMask;
         u1* ptr = (u1*) filePointer(state, newOffset);
@@ -2459,7 +2460,7 @@ static bool iterateSectionWithOptionalUpdate(CheckState* state,
  * concatenated items of the same type. This variant will not update the data
  * map.
  */
-static bool iterateSection(CheckState* state, u4 offset, u4 count,
+static bool  iterateSection(CheckState* state, u4 offset, u4 count,
         ItemVisitorFunction* func, u4 alignment, u4* nextOffset) {
     return iterateSectionWithOptionalUpdate(state, offset, count, func,
             alignment, nextOffset, -1);
@@ -2532,14 +2533,15 @@ static bool swapEverythingButHeaderAndMap(CheckState* state,
     u4 count = pMap->size;
     bool okay = true;
 
-    while (okay && count--) {
+    while (okay && count--) {
         u4 sectionOffset = item->offset;
         u4 sectionCount = item->size;
         u2 type = item->type;
-
+		//lastOffset应该等于sectionOffset
         if (lastOffset < sectionOffset) {
             CHECK_OFFSET_RANGE(lastOffset, sectionOffset);
             const u1* ptr = (const u1*) filePointer(state, lastOffset);
+			//判断是否赋值
             while (lastOffset < sectionOffset) {
                 if (*ptr != '\0') {
                     ALOGE("Non-zero padding 0x%02x before section start @ %x",
