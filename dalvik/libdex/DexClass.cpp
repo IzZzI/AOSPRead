@@ -28,7 +28,7 @@
 static bool verifyUlebs(const u1* pData, const u1* pLimit, u4 count) {
     bool okay = true;
     u4 i;
-
+	//count = 4
     while (okay && (count-- != 0)) {
         readAndVerifyUnsignedLeb128(&pData, pLimit, &okay);
     }
@@ -41,10 +41,11 @@ static bool verifyUlebs(const u1* pData, const u1* pLimit, u4 count) {
  * returns an "okay" flag (that is, false == failure). */
 bool dexReadAndVerifyClassDataHeader(const u1** pData, const u1* pLimit,
         DexClassDataHeader *pHeader) {
+    //验证是否使用leb128
     if (! verifyUlebs(*pData, pLimit, 4)) {
         return false;
     }
-
+	//读取DexClassDataHeader数据
     dexReadClassDataHeader(pData, pHeader);
     return true;
 }
@@ -104,17 +105,20 @@ bool dexReadAndVerifyClassDataMethod(const u1** pData, const u1* pLimit,
 DexClassData* dexReadAndVerifyClassData(const u1** pData, const u1* pLimit) {
     DexClassDataHeader header;
     u4 lastIndex;
-
+	//如果data区域没有初始化
     if (*pData == NULL) {
+		//分配内存
         DexClassData* result = (DexClassData*) malloc(sizeof(DexClassData));
+		//初始化
         memset(result, 0, sizeof(*result));
         return result;
     }
-
+	//验证是否使用leb128格式并读取DexClassDataHeader
+	//pLimit = state->fileEnd
     if (! dexReadAndVerifyClassDataHeader(pData, pLimit, &header)) {
         return NULL;
     }
-
+	
     size_t resultSize = sizeof(DexClassData) +
         (header.staticFieldsSize * sizeof(DexField)) +
         (header.instanceFieldsSize * sizeof(DexField)) +
@@ -159,24 +163,25 @@ DexClassData* dexReadAndVerifyClassData(const u1** pData, const u1* pLimit) {
         result->virtualMethods = NULL;
     }
 
+	//staticFields检验与赋值
     lastIndex = 0;
     for (i = 0; okay && (i < header.staticFieldsSize); i++) {
         okay = dexReadAndVerifyClassDataField(pData, pLimit,
                 &result->staticFields[i], &lastIndex);
     }
-
+	//instanceFields校验与赋值
     lastIndex = 0;
     for (i = 0; okay && (i < header.instanceFieldsSize); i++) {
         okay = dexReadAndVerifyClassDataField(pData, pLimit,
                 &result->instanceFields[i], &lastIndex);
     }
-
+	//directMethods校验与赋值
     lastIndex = 0;
     for (i = 0; okay && (i < header.directMethodsSize); i++) {
         okay = dexReadAndVerifyClassDataMethod(pData, pLimit,
                 &result->directMethods[i], &lastIndex);
     }
-
+	//virtualMethods校验与赋值
     lastIndex = 0;
     for (i = 0; okay && (i < header.virtualMethodsSize); i++) {
         okay = dexReadAndVerifyClassDataMethod(pData, pLimit,

@@ -559,7 +559,7 @@ static void* swapStringIdItem(const CheckState* state, void* ptr) {
 /* Perform cross-item verification of string_id_item. */
 static void* crossVerifyStringIdItem(const CheckState* state, void* ptr) {
     const DexStringId* item = (const DexStringId*) ptr;
-
+	//检验DexDataMap中的类型是否一致
     if (!dexDataMapVerify(state->pDataMap,
                     item->stringDataOff, kDexTypeStringDataItem)) {
         return NULL;
@@ -570,6 +570,7 @@ static void* crossVerifyStringIdItem(const CheckState* state, void* ptr) {
         // Check ordering.
         const char* s0 = dexGetStringData(state->pDexFile, item0);
         const char* s1 = dexGetStringData(state->pDexFile, item);
+		//比较字符串顺序，字符串需要排序？
         if (dexUtf8Cmp(s0, s1) >= 0) {
             ALOGE("Out-of-order string_ids: '%s' then '%s'", s0, s1);
             return NULL;
@@ -584,6 +585,7 @@ static void* swapTypeIdItem(const CheckState* state, void* ptr) {
     DexTypeId* item = (DexTypeId*) ptr;
 
     CHECK_PTR_RANGE(item, item + 1);
+	//翻转并检查descriptorIdx是否大于stringIdsSize
     SWAP_INDEX4(item->descriptorIdx, state->pHeader->stringIdsSize);
 
     return item + 1;
@@ -1153,6 +1155,39 @@ static u1* swapParameterAnnotations(const CheckState* state, u4 count,
     return (u1*) item;
 }
 
+		
+/*
+struct annotations_directory_item {
+	uint	class_annotations_off;								//从文件开头到直接在该类上所做的注释的偏移量；
+	uint	fields_size;										//此项所注释的字段数量	
+	uint	annotated_methods_size;								//此项所注释的方法数量
+	uint	annotated_parameters_size;							//此项所注释的方法参数列表的数量
+	field_annotation[]	field_annotations;						//所关联字段的注释列表
+	method_annotation[]	method_annotations;						//所关联方法的注释列表
+	parameter_annotation[]	parameter_annotations;				//所关联方法参数的注释列表
+}
+
+
+struct field_annotation {
+	uint	field_idx;				//字段（带注释）标识的 field_ids 列表中的索引
+	uint	annotations_off;		//从文件开头到该字段的注释列表的偏移量
+}
+
+
+struct method_annotation {
+	uint	method_idx;
+	uint	annotations_off;
+}
+
+
+struct parameter_annotation {
+	uint	method_idx;
+	uint	annotations_off;
+}
+
+*/
+
+
 /* Perform byte-swapping and intra-item verification on
  * annotations_directory_item. */
 static void* swapAnnotationsDirectoryItem(const CheckState* state, void* ptr) {
@@ -1167,6 +1202,7 @@ static void* swapAnnotationsDirectoryItem(const CheckState* state, void* ptr) {
     u1* addr = (u1*) (item + 1);
 
     if (item->fieldsSize != 0) {
+		//翻转关联字段注释列表
         addr = swapFieldAnnotations(state, item->fieldsSize, addr);
         if (addr == NULL) {
             return NULL;
@@ -1174,6 +1210,7 @@ static void* swapAnnotationsDirectoryItem(const CheckState* state, void* ptr) {
     }
 
     if (item->methodsSize != 0) {
+		//翻转关联方法注释列表
         addr = swapMethodAnnotations(state, item->methodsSize, addr);
         if (addr == NULL) {
             return NULL;
@@ -1181,6 +1218,7 @@ static void* swapAnnotationsDirectoryItem(const CheckState* state, void* ptr) {
     }
 
     if (item->parametersSize != 0) {
+		//翻转关联参数注释列表
         addr = swapParameterAnnotations(state, item->parametersSize, addr);
         if (addr == NULL) {
             return NULL;
@@ -1451,15 +1489,16 @@ static bool verifyFields(const CheckState* state, u4 size,
     for (i = 0; i < size; i++) {
         DexField* field = &fields[i];
         u4 accessFlags = field->accessFlags;
+		//是否静态
         bool isStatic = (accessFlags & ACC_STATIC) != 0;
-
+		//是否越界
         CHECK_INDEX(field->fieldIdx, state->pHeader->fieldIdsSize);
-
+		
         if (isStatic != expectStatic) {
             ALOGE("Field in wrong list @ %d", i);
             return false;
         }
-
+		//判断标识符是否合法
         if ((accessFlags & ~ACC_FIELD_MASK) != 0) {
             // The VM specification says that unknown flags should be ignored.
             ALOGV("Bogus field access flags %x @ %d", accessFlags, i);
@@ -1568,7 +1607,7 @@ static void* intraVerifyClassDataItem(const CheckState* state, void* ptr) {
         ALOGE("Unable to parse class_data_item");
         return NULL;
     }
-
+	//校验DexClassData
     bool okay = verifyClassDataItem0(state, classData);
 
     free(classData);
@@ -1864,12 +1903,25 @@ static void* swapCodeItem(const CheckState* state, void* ptr) {
                 return NULL;
             }
         }
-
+		//翻转try-catch
         ptr = swapTriesAndCatches(state, item);
     }
 
     return ptr;
 }
+
+
+/*
+struct string_data_item
+
+{
+
+uleb128 utf16_size;  
+
+ubyte data;
+
+}
+*/
 
 /* Perform intra-item verification on string_data_item. */
 static void* intraVerifyStringDataItem(const CheckState* state, void* ptr) {
@@ -1887,11 +1939,14 @@ static void* intraVerifyStringDataItem(const CheckState* state, void* ptr) {
     for (i = 0; i < utf16Size; i++) {
         if (data >= fileEnd) {
             ALOGE("String data would go beyond end-of-file");
-            return NULL;
+     	       return NULL;
         }
 
+		//取第一个字节
         u1 byte1 = *(data++);
-
+		//data区存放的string并不是ascii编码，而是MUTF-8编码	
+		//https://blog.csdn.net/roland_sun/article/details/46716965
+		//	其值小于等于0x7F（127）的话，则MUTF-8直接用一个字节对其编码
         // Switch on the high four bits.
         switch (byte1 >> 4) {
             case 0x00: {
@@ -1911,12 +1966,14 @@ static void* intraVerifyStringDataItem(const CheckState* state, void* ptr) {
             case 0x06:
             case 0x07: {
                 // Bit pattern 0xxx. No need for any extra bytes or checks.
+                // 字节以0开头表示只用一个字节
                 break;
             }
             case 0x08:
             case 0x09:
             case 0x0a:
             case 0x0b:
+			//1111 不符合MUTF-8编码	格式
             case 0x0f: {
                 /*
                  * Bit pattern 10xx or 1111, which are illegal start bytes.
@@ -1926,18 +1983,24 @@ static void* intraVerifyStringDataItem(const CheckState* state, void* ptr) {
                 ALOGE("Illegal start byte %#x", byte1);
                 return NULL;
             }
+			//1110 表示使用的三字节编码
             case 0x0e: {
                 // Bit pattern 1110, so there are two additional bytes.
                 u1 byte2 = *(data++);
+				//	0xc0 = 1100 0000 0x80 = 1000 0000
+				//第二字节必须以10开头
                 if ((byte2 & 0xc0) != 0x80) {
                     ALOGE("Illegal continuation byte %#x", byte2);
                     return NULL;
                 }
                 u1 byte3 = *(data++);
+				//第三字节也必须以10开头
                 if ((byte3 & 0xc0) != 0x80) {
                     ALOGE("Illegal continuation byte %#x", byte3);
                     return NULL;
                 }
+				// 0x0f = 0000 1111       0x3f = 0011 1111
+				//第一字节后四位 第二第三字节后六位
                 u2 value = ((byte1 & 0x0f) << 12) | ((byte2 & 0x3f) << 6)
                     | (byte3 & 0x3f);
                 if (value < 0x800) {
@@ -1946,6 +2009,8 @@ static void* intraVerifyStringDataItem(const CheckState* state, void* ptr) {
                 }
                 break;
             }
+			//0x0c = 1100 0x0d = 1101
+			//两字节编码
             case 0x0c:
             case 0x0d: {
                 // Bit pattern 110x, so there is one additional byte.
@@ -1963,7 +2028,7 @@ static void* intraVerifyStringDataItem(const CheckState* state, void* ptr) {
             }
         }
     }
-
+	//空字符结尾
     if (*(data++) != '\0') {
         ALOGE("String longer than indicated utf16_size %#x", utf16Size);
         return NULL;
@@ -1971,6 +2036,18 @@ static void* intraVerifyStringDataItem(const CheckState* state, void* ptr) {
 
     return (void*) data;
 }
+/*
+	debug_info_item：
+
+	line_start	uleb128
+	parameters_size	uleb128 已编码的参数名称的数量
+	parameter_names	uleb128p1[parameters_size] 方法参数名称的字符串索引
+	
+	每个 debug_info_item 都会定义一个基于 DWARF3 的字节码状态机，在解译时，
+	系统会发出 (emit) code_item 的位置表，并可能会发出 (emit) 其局部变量信息。
+	该序列的开头是一个可变长度的头文件（其长度取决于方法参数的数量），后跟状态机字节码，
+	最后以 DBG_END_SEQUENCE 字节结尾。
+*/
 
 /* Perform intra-item verification on debug_info_item. */
 static void* intraVerifyDebugInfoItem(const CheckState* state, void* ptr) {
@@ -2023,7 +2100,9 @@ static void* intraVerifyDebugInfoItem(const CheckState* state, void* ptr) {
                 done = true;
                 break;
             }
+			//使地址寄存器指向下一个地址，而不发出 (emit) 位置条目
             case DBG_ADVANCE_PC: {
+				
                 readAndVerifyUnsignedLeb128(&data, fileEnd, &okay);
                 break;
             }
@@ -2137,6 +2216,13 @@ static u4 readUnsignedLittleEndian(const CheckState* state, const u1** pData,
     *pData = data;
     return result;
 }
+/*
+	struct encoded_array {
+		uleb128	size;					//数组中的元素数量
+		encoded_value[]	values;			//size encoded_value 字节序列；依序连接
+	}
+
+*/
 
 /* Helper for *VerifyAnnotationItem() and *VerifyEncodedArrayItem(), which
  * verifies an encoded_array. */
@@ -2166,12 +2252,15 @@ static const u1* verifyEncodedArray(const CheckState* state,
 static const u1* verifyEncodedValue(const CheckState* state,
         const u1* data, bool crossVerify) {
     CHECK_PTR_RANGE(data, data + 1);
-
+	//高三位为valueArg - value字节长度 - 1,低五位为valueType
     u1 headerByte = *(data++);
+	//kDexAnnotationValueTypeMask = 0001 1111;
     u4 valueType = headerByte & kDexAnnotationValueTypeMask;
+	//kDexAnnotationValueArgShift = 5;
     u4 valueArg = headerByte >> kDexAnnotationValueArgShift;
 
     switch (valueType) {
+		//有符号的单字节整数值
         case kDexAnnotationByte: {
             if (valueArg != 0) {
                 ALOGE("Bogus byte size %#x", valueArg);
@@ -2180,6 +2269,7 @@ static const u1* verifyEncodedValue(const CheckState* state,
             data++;
             break;
         }
+		//双字节数值
         case kDexAnnotationShort:
         case kDexAnnotationChar: {
             if (valueArg > 1) {
@@ -2189,6 +2279,7 @@ static const u1* verifyEncodedValue(const CheckState* state,
             data += valueArg + 1;
             break;
         }
+		//四字节数值
         case kDexAnnotationInt:
         case kDexAnnotationFloat: {
             if (valueArg > 3) {
@@ -2198,11 +2289,13 @@ static const u1* verifyEncodedValue(const CheckState* state,
             data += valueArg + 1;
             break;
         }
+		//八字节数值
         case kDexAnnotationLong:
         case kDexAnnotationDouble: {
             data += valueArg + 1;
             break;
         }
+		//无符号四字节整数值,string_ids 区段的索引
         case kDexAnnotationString: {
             if (valueArg > 3) {
                 ALOGE("Bogus string size %#x", valueArg);
@@ -2212,6 +2305,7 @@ static const u1* verifyEncodedValue(const CheckState* state,
             CHECK_INDEX(idx, state->pHeader->stringIdsSize);
             break;
         }
+		//无符号四字节整数值,type_ids 区段的索引
         case kDexAnnotationType: {
             if (valueArg > 3) {
                 ALOGE("Bogus type size %#x", valueArg);
@@ -2221,6 +2315,7 @@ static const u1* verifyEncodedValue(const CheckState* state,
             CHECK_INDEX(idx, state->pHeader->typeIdsSize);
             break;
         }
+		//无符号四字节整数值,field_ids 区段的索引
         case kDexAnnotationField:
         case kDexAnnotationEnum: {
             if (valueArg > 3) {
@@ -2231,6 +2326,7 @@ static const u1* verifyEncodedValue(const CheckState* state,
             CHECK_INDEX(idx, state->pHeader->fieldIdsSize);
             break;
         }
+		//无符号四字节整数值,method_ids 区段的索引
         case kDexAnnotationMethod: {
             if (valueArg > 3) {
                 ALOGE("Bogus method size %#x", valueArg);
@@ -2240,6 +2336,7 @@ static const u1* verifyEncodedValue(const CheckState* state,
             CHECK_INDEX(idx, state->pHeader->methodIdsSize);
             break;
         }
+		//值的数组,encoded_array 格式
         case kDexAnnotationArray: {
             if (valueArg != 0) {
                 ALOGE("Bogus array value_arg %#x", valueArg);
@@ -2248,6 +2345,7 @@ static const u1* verifyEncodedValue(const CheckState* state,
             data = verifyEncodedArray(state, data, crossVerify);
             break;
         }
+		//子注释,encoded_annotation 格式
         case kDexAnnotationAnnotation: {
             if (valueArg != 0) {
                 ALOGE("Bogus annotation value_arg %#x", valueArg);
@@ -2256,6 +2354,7 @@ static const u1* verifyEncodedValue(const CheckState* state,
             data = verifyEncodedAnnotation(state, data, crossVerify);
             break;
         }
+		//null 引用值
         case kDexAnnotationNull: {
             if (valueArg != 0) {
                 ALOGE("Bogus null value_arg %#x", valueArg);
@@ -2264,6 +2363,7 @@ static const u1* verifyEncodedValue(const CheckState* state,
             // Nothing else to do for this type.
             break;
         }
+		//一位值；0 表示 false，1 表示 true。该位在 value_arg 中有所表示
         case kDexAnnotationBoolean: {
             if (valueArg > 1) {
                 ALOGE("Bogus boolean value_arg %#x", valueArg);
@@ -2281,6 +2381,27 @@ static const u1* verifyEncodedValue(const CheckState* state,
     return data;
 }
 
+/*
+	struct encoded_annotation {
+		uleb128 type_idx;   					//注释的类型。这种类型必须是“类”（而非“数组”或“基元”）。
+		uleb128	size;							//此注释中 name-value 映射的数量
+		annotation_element[] elements;	//注释的元素，直接以内嵌形式（不作为偏移量）表示,元素必须按 string_id 索引以升序进行排序。
+		
+	}
+
+	struct annotation_element {
+		uleb128	name_idx;			//元素名称，表示为要编入 string_ids 区段的索引
+		encoded_value	value;		//元素值
+
+	}
+
+	struct encoded_value {
+		ubyte	(value_arg << 5) | value_type;
+		ubyte[]	value;
+	}
+	
+*/
+
 /* Helper for *VerifyAnnotationItem() and *VerifyEncodedArrayItem(), which
  * verifies an encoded_annotation. */
 static const u1* verifyEncodedAnnotation(const CheckState* state,
@@ -2295,7 +2416,7 @@ static const u1* verifyEncodedAnnotation(const CheckState* state,
     }
 
     CHECK_INDEX(idx, state->pHeader->typeIdsSize);
-
+	
     if (crossVerify) {
         const char* descriptor = dexStringByTypeIdx(state->pDexFile, idx);
         if (!dexIsClassDescriptor(descriptor)) {
@@ -2338,7 +2459,7 @@ static const u1* verifyEncodedAnnotation(const CheckState* state,
                     lastIdx, idx);
             return NULL;
         }
-
+		//校验encoded_value 
         data = verifyEncodedValue(state, data, crossVerify);
         lastIdx = idx;
 
@@ -2355,15 +2476,27 @@ static void* intraVerifyEncodedArrayItem(const CheckState* state, void* ptr) {
     return (void*) verifyEncodedArray(state, (const u1*) ptr, false);
 }
 
+/*
+annotation_item ：
+
+visibility	ubyte	此注释的预期可见性（见下文
+annotation	encoded_annotation	已编码的注释内容
+
+
+*/
+
 /* Perform intra-item verification on annotation_item. */
 static void* intraVerifyAnnotationItem(const CheckState* state, void* ptr) {
     const u1* data = (const u1*) ptr;
 
     CHECK_PTR_RANGE(data, data + 1);
-
+	//检测此注释的预期可见性
     switch (*(data++)) {
-        case kDexVisibilityBuild:
+		//预计仅在构建时（例如，在编译其他代码期间）可见
+        case kDexVisibilityBuild:
+		//预计在运行时可见
         case kDexVisibilityRuntime:
+		//预计在运行时可见，但仅对基本系统（而不是常规用户代码）可见
         case kDexVisibilitySystem: {
             break;
         }
@@ -2409,6 +2542,7 @@ static bool iterateSectionWithOptionalUpdate(CheckState* state,
     state->previousItem = NULL;
 	//项内个数
     for (i = 0; i < count; i++) {
+		//（a+b）& ~b的含义是a在(b+1)的倍数中的最小下界
         u4 newOffset = (offset + alignmentMask) & ~alignmentMask;
         u1* ptr = (u1*) filePointer(state, newOffset);
 
@@ -2426,7 +2560,7 @@ static bool iterateSectionWithOptionalUpdate(CheckState* state,
                 }
             }
         }
-
+		//对应项进行翻转并指针后移一位
         u1* newPtr = (u1*) func(state, ptr);
         newOffset = fileOffset(state, newPtr);
 
@@ -2439,8 +2573,9 @@ static bool iterateSectionWithOptionalUpdate(CheckState* state,
             ALOGE("Item %d @ offset %#x ends out of bounds", i, offset);
             return false;
         }
-
+		//为data区域的类型赋值
         if (mapType >= 0) {
+			//DexDataMap赋值
             dexDataMapAdd(state->pDataMap, offset, mapType);
         }
 
@@ -2573,13 +2708,15 @@ static bool swapEverythingButHeaderAndMap(CheckState* state,
                 break;
             }
             case kDexTypeStringIdItem: {
+				//检查并翻转字符串id
                 okay = checkBoundsAndIterateSection(state, sectionOffset,
                         sectionCount, state->pHeader->stringIdsOff,
                         state->pHeader->stringIdsSize, swapStringIdItem,
                         sizeof(u4), &lastOffset);
                 break;
             }
-            case kDexTypeTypeIdItem: {
+            case kDexTypeTypeIdItem: {
+				//检查并翻转
                 okay = checkBoundsAndIterateSection(state, sectionOffset,
                         sectionCount, state->pHeader->typeIdsOff,
                         state->pHeader->typeIdsSize, swapTypeIdItem,
@@ -2926,10 +3063,11 @@ int dexSwapAndVerify(u1* addr, int len)
         if (pHeader->mapOff != 0) {
             DexFile dexFile;
             DexMapList* pDexMap = (DexMapList*) (addr + pHeader->mapOff);
-			//矫正map
+			//翻转map
             okay = okay && swapMap(&state, pDexMap);
+			//验证并翻转所有的数据
             okay = okay && swapEverythingButHeaderAndMap(&state, pDexMap);
-
+			//为dexFile赋值
             dexFileSetupBasicPointers(&dexFile, addr);
             state.pDexFile = &dexFile;
 

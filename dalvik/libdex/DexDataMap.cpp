@@ -99,11 +99,11 @@ int dexDataMapGet(DexDataMap* map, u4 offset) {
     int min = 0;
     int max = map->count - 1;
     u4* offsets = map->offsets;
-
+	//二分法找到对应offset的类型
     while (max >= min) {
         int guessIdx = (min + max) >> 1;
         u4 guess = offsets[guessIdx];
-
+		
         if (offset < guess) {
             max = guessIdx - 1;
         } else if (offset > guess) {
@@ -124,6 +124,7 @@ int dexDataMapGet(DexDataMap* map, u4 offset) {
  * return false as well as log an error if not.
  */
 bool dexDataMapVerify(DexDataMap* map, u4 offset, u2 type) {
+	//二分法找到offset对应的类型,未找到返回-1
     int found = dexDataMapGet(map, offset);
 
     if (found == type) {

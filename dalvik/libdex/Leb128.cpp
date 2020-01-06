@@ -33,7 +33,7 @@ int readAndVerifyUnsignedLeb128(const u1** pStream, const u1* limit,
         bool* okay) {
     const u1* ptr = *pStream;
     int result = readUnsignedLeb128(pStream);
-
+	//判断是否越界或者是否读了5字节并且第五字节的内容占用超过4位（ptr[4] >0000 1111）
     if (((limit != NULL) && (*pStream > limit))
             || (((*pStream - ptr) == 5) && (ptr[4] > 0x0f))) {
         *okay = false;

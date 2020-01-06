@@ -261,13 +261,14 @@ struct DexMapList {
  * Direct-mapped "string_id_item".
  */
 struct DexStringId {
-    u4 stringDataOff;      /* file offset to string_data_item */
+    u4 stringDataOff;      /* file offset to string_data_item */ 
 };
 
 /*
  * Direct-mapped "type_id_item".
  */
 struct DexTypeId {
+	//string_ids 里的 index 序号，是用来描述此 type 的字符串。
     u4  descriptorIdx;      /* index into stringIds list for type descriptor */
 };
 
@@ -275,40 +276,60 @@ struct DexTypeId {
  * Direct-mapped "field_id_item".
  */
 struct DexFieldId {
-    u2  classIdx;           /* index into typeIds list for defining class */
+	//field所属的class类型,type_ids的下标
+    u2  classIdx;           /* index into typeIds list for defining class */ 
+	//类型,也是typd_ids的下标
     u2  typeIdx;            /* index into typeIds for field type */
+	//名称,stringIds下标
     u4  nameIdx;            /* index into stringIds for field name */
 };
 
 /*
  * Direct-mapped "method_id_item".
+ * 是索引区的最后一个条目,描述了 dex 文件里的所有的 method
  */
 struct DexMethodId {
+	// method 所属的class类型
     u2  classIdx;           /* index into typeIds list for defining class */
+	// method类型, protoIds的下标
     u2  protoIdx;           /* index into protoIds for method prototype */
+	// method方法, stringIds是下标
     u4  nameIdx;            /* index into stringIds for method name */
 };
 
 /*
- * Direct-mapped "proto_id_item".
+ * Direct-mapped "proto_id_item".  proto 的意思是 method prototype 
+ * 代表 java 语言里的一个 method 的原型 
  */
 struct DexProtoId {
-    u4  shortyIdx;          /* index into stringIds for shorty descriptor */
-    u4  returnTypeIdx;      /* index into typeIds list for return type */
-    u4  parametersOff;      /* file offset to type_list for parameter types */
+	//简短的字符串描述，用来说明该 method 原型。
+    u4  shortyIdx;          /* index into stringIds for shorty descriptor */ 
+	// type_ids 的 index 号 ，表示该 method 原型的返回值类型
+    u4  returnTypeIdx;      /* index into typeIds list for return type */ 
+	//method 原型的参数列表 type_list，若 method 没有参数，值为0
+    u4  parametersOff;      /* file offset to type_list for parameter types */ 
 };
 
 /*
  * Direct-mapped "class_def_item".
+ * class的定义
  */
 struct DexClassDef {
+	//具体的class类型, typeIds的下标
     u4  classIdx;           /* index into typeIds for this class */
+	//描述 class 的访问类型，诸如 public , final , static 等
     u4  accessFlags;
+	//父类的类型, typeIds下标
     u4  superclassIdx;      /* index into typeIds for superclass */
+	//class的接口的偏移量, 指向的数据结构为DexTypeList,没有接口值为0
     u4  interfacesOff;      /* file offset to DexTypeList */
+	//源文件名称, string_ids的下标,若此项信息缺失，此项值赋值为 NO_INDEX=0xffff ffff。
     u4  sourceFileIdx;      /* index into stringIds for source file name */
+	//注释的偏移量, annotations_direcotry_item结构，没有则为0
     u4  annotationsOff;     /* file offset to annotations_directory_item */
+	//用到的数据偏移量, 为class_data_item结构，没有则为0
     u4  classDataOff;       /* file offset to class_data_item */
+	//静态值的偏移量, 为DexEncodedArray结构
     u4  staticValuesOff;    /* file offset to DexEncodedArray */
 };
 
@@ -316,6 +337,7 @@ struct DexClassDef {
  * Direct-mapped "type_item".
  */
 struct DexTypeItem {
+	//typeIds的下标
     u2  typeIdx;            /* index into typeIds */
 };
 
@@ -323,7 +345,9 @@ struct DexTypeItem {
  * Direct-mapped "type_list".
  */
 struct DexTypeList {
+	//类型个数
     u4  size;               /* #of entries in list */
+	//DexTypeItem结构
     DexTypeItem list[1];    /* entries */
 };
 
@@ -335,13 +359,13 @@ struct DexTypeList {
  * debugging. An offset of zero indicates that there are no entries.
  */
 struct DexCode {
-    u2  registersSize;
-    u2  insSize;
-    u2  outsSize;
-    u2  triesSize;
+    u2  registersSize; 		/*寄存器个数*/
+    u2  insSize; 			/*输入参数个数*/
+    u2  outsSize;			/*外部方法使用参数个数*/
+    u2  triesSize;			/*try-catch个数*/
     u4  debugInfoOff;       /* file offset to debug info stream */
-    u4  insnsSize;          /* size of the insns array, in u2 units */
-    u2  insns[1];
+    u4  insnsSize;          /* size of the insns array, in u2 units 方法指令个数 */
+    u2  insns[1];			/*真实指令数组*/
     /* followed by optional u2 padding */
     /* followed by try_item[triesSize] */
     /* followed by uleb128 handlersSize */
@@ -369,10 +393,10 @@ struct DexLink {
  * Direct-mapped "annotations_directory_item".
  */
 struct DexAnnotationsDirectoryItem {
-    u4  classAnnotationsOff;  /* offset to DexAnnotationSetItem */
-    u4  fieldsSize;           /* count of DexFieldAnnotationsItem */
-    u4  methodsSize;          /* count of DexMethodAnnotationsItem */
-    u4  parametersSize;       /* count of DexParameterAnnotationsItem */
+    u4  classAnnotationsOff;  /* offset to DexAnnotationSetItem 从文件开头到直接在该类上所做的注释的偏移量 */
+    u4  fieldsSize;           /* count of DexFieldAnnotationsItem 此项所注释的字段数量 */
+    u4  methodsSize;          /* count of DexMethodAnnotationsItem 此项所注释的方法数量 */
+    u4  parametersSize;       /* count of DexParameterAnnotationsItem 此项所注释的方法参数列表的数量*/
     /* followed by DexFieldAnnotationsItem[fieldsSize] */
     /* followed by DexMethodAnnotationsItem[methodsSize] */
     /* followed by DexParameterAnnotationsItem[parametersSize] */
@@ -609,6 +633,14 @@ DEX_INLINE const DexMapList* dexGetMap(const DexFile* pDexFile) {
         return (const DexMapList*) (pDexFile->baseAddr + mapOff);
     }
 }
+/*
+
+struct string_data_item {
+	uleb128		utf16_size;		//此字符串
+	ubyte[]		data;			//MUTF-8格式编码，最后一个值为0
+}
+
+*/
 
 /* return the const char* string data referred to by the given string_id */
 DEX_INLINE const char* dexGetStringData(const DexFile* pDexFile,
@@ -616,8 +648,9 @@ DEX_INLINE const char* dexGetStringData(const DexFile* pDexFile,
     const u1* ptr = pDexFile->baseAddr + pStringId->stringDataOff;
 
     // Skip the uleb128 length.
+    //0x7f = 0111 1111 判断首位是否为1
     while (*(ptr++) > 0x7f) /* empty */ ;
-
+	//上面跳过了utf16_size
     return (const char*) ptr;
 }
 /* return the StringId with the specified index */

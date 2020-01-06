@@ -30,17 +30,23 @@
  */
 DEX_INLINE int readUnsignedLeb128(const u1** pStream) {
     const u1* ptr = *pStream;
+	//result 4字节
     int result = *(ptr++);
-
+	//7f = 127 = 01111111 判断最高位是否为1,为1继续读下一字节,为0则表示终止
     if (result > 0x7f) {
-        int cur = *(ptr++);
+		//再后移一字节
+        int cur = *(ptr++);
+       	//result去最高位, cur去最高位左移7位, 结果为00+cur去最高位+result去最高位（小端字节）
         result = (result & 0x7f) | ((cur & 0x7f) << 7);
+		//如果第二个字节最高位也是1,继续读第三个字节
         if (cur > 0x7f) {
             cur = *(ptr++);
             result |= (cur & 0x7f) << 14;
+			//读第四个字节
             if (cur > 0x7f) {
                 cur = *(ptr++);
                 result |= (cur & 0x7f) << 21;
+				//因为leb128首位用作标识,则有可能需要第五个字节
                 if (cur > 0x7f) {
                     /*
                      * Note: We don't check to see if cur is out of

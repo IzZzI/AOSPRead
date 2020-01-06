@@ -25,23 +25,32 @@
 #include "Leb128.h"
 
 /* expanded form of a class_data_item header */
-struct DexClassDataHeader {
+struct DexClassDataHeader {
+	//静态成员变量的个数
     u4 staticFieldsSize;
+	//实例成员变量个数
     u4 instanceFieldsSize;
+	//直接函数个数
     u4 directMethodsSize;
+	//虚函数个数
     u4 virtualMethodsSize;
 };
 
 /* expanded form of encoded_field */
 struct DexField {
+	//fieldIds下标
     u4 fieldIdx;    /* index to a field_id_item */
+	//访问权限
     u4 accessFlags;
 };
 
 /* expanded form of encoded_method */
 struct DexMethod {
+	// methodIds的下标
     u4 methodIdx;    /* index to a method_id_item */
+	// 访问权限
     u4 accessFlags;
+	// method 的代码实现的偏移量
     u4 codeOff;      /* file offset to a code_item */
 };
 
